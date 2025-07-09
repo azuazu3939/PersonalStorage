@@ -1,0 +1,9 @@
+name: PersonalStorage
+version: '1.0.0'
+main: com.github.azuazu3939.PersonalStorage
+api-version: '1.21'
+authors: [ MCLove32 ]
+
+commands:
+  autopickup:
+    description: アイテム取得と同時に倉庫へ送る機能のtoggle
