@@ -56,16 +56,10 @@ internal class ItemBoxListener : Listener {
             e.playSound(e, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 2f)
         }, 5)
         PersonalStorage.runSyncDelay(runnable = {
-            e.playSound(e, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 2f)
-        }, 10)
-        PersonalStorage.runSyncDelay(runnable = {
-            e.playSound(e, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 2f)
-        }, 15)
-        PersonalStorage.runSyncDelay(runnable = {
             e.closeInventory()
             e.playSound(e, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 0.5f)
             InventoryManager.openMainCategoryInventory(e)
-        }, 20)
+        }, 10)
     }
 
     @EventHandler
@@ -173,7 +167,7 @@ internal class ItemBoxListener : Listener {
                     item
                 ) {
                     val displayName = ItemCategoryManager.getDisplayName(item)
-                    player.sendMessage("§a$displayName x${item.amount} を個人倉庫に格納しました")
+                    player.sendActionBar(Component.text("§a$displayName x${item.amount} を個人倉庫に格納しました"))
                     player.playSound(player, Sound.ENTITY_ITEM_PICKUP, 0.2f, 1f)
 
                     //同時に複数所拾うとデータ保存先が被る修正: End
@@ -263,7 +257,7 @@ internal class ItemBoxListener : Listener {
                     item
                 ) {
                     val displayName = ItemCategoryManager.getDisplayName(item)
-                    player.sendMessage("§a$displayName x${item.amount} を個人倉庫に格納しました")
+                    player.sendActionBar(Component.text("§a$displayName x${item.amount} を個人倉庫に格納しました"))
 
                     //同時に複数所拾うとデータ保存先が被る修正: End
                     syncSlot.remove(Pair(player.uniqueId, fSlot))
@@ -276,6 +270,11 @@ internal class ItemBoxListener : Listener {
     @EventHandler
     fun onInventoryClose(e: InventoryCloseEvent) {
         val player = e.player as Player
+
+        //Editモードで選択中にInvを閉じると取り出せる問題の修正
+        if (InventoryClickHandler.isEditMode(player.uniqueId)) {
+            e.view.setCursor(null)
+        }
         
         // 詳細アイテム層の場合、インベントリの変更をデータベースに保存
         if (e.inventory.holder is DetailItemHolder) {

@@ -22,6 +22,10 @@ class InventoryClickHandler {
             editMode.remove(uuid)
         }
 
+        fun isEditMode(uuid: UUID): Boolean {
+            return editMode.contains(uuid)
+        }
+
         fun handleInventoryClick(event: InventoryClickEvent) {
             val player = event.whoClicked as Player
             val currentLayer = InventoryManager.getCurrentLayer(player) ?: return
