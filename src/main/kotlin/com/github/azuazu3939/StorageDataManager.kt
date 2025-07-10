@@ -1,6 +1,7 @@
 package com.github.azuazu3939
 
 import org.bukkit.Material
+import org.bukkit.NamespacedKey
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
 import java.sql.SQLException
@@ -10,6 +11,9 @@ class StorageDataManager {
     companion object {
         
         fun saveItem(player: Player, category: String, mmid: String, fSlot: Int, sSlot: Int, item: ItemStack?, callback: (() -> Unit)? = null) {
+            if (item != null && item.itemMeta.persistentDataContainer.has(NamespacedKey.minecraft("mmid"))) {
+                item.amount = 0
+            }
             PersonalStorage.runAsync(runnable = {
                 try {
                     if (item == null) {

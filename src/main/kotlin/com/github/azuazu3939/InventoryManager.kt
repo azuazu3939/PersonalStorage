@@ -105,7 +105,11 @@ class InventoryManager {
             playerCurrentFirstSlot.remove(player.uniqueId)
             playerCurrentDetailPage.remove(player.uniqueId)
             playerCurrentItemIdPage.remove(player.uniqueId)
-            InventoryClickHandler.removeEditMode(player.uniqueId)
+
+            if (InventoryClickHandler.isEditMode(player.uniqueId)) {
+                player.sendMessage(Component.text("§c編集モードを無効にしました"))
+                InventoryClickHandler.removeEditMode(player.uniqueId)
+            }
         }
 
         private fun setItemIdItem(player: Player, category: String, page: Int, inv: Inventory, callback: (Inventory) -> Unit) {

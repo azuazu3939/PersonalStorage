@@ -2,7 +2,6 @@
 
 package com.github.azuazu3939
 
-import net.kyori.adventure.text.Component
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.Sound
@@ -10,7 +9,7 @@ import org.bukkit.entity.Player
 import org.bukkit.event.inventory.InventoryClickEvent
 import org.bukkit.persistence.PersistentDataContainer
 import org.bukkit.persistence.PersistentDataType
-import java.util.UUID
+import java.util.*
 
 class InventoryClickHandler {
 
@@ -76,15 +75,6 @@ class InventoryClickHandler {
             event.isCancelled = true
             val category = InventoryManager.getCurrentCategory(player) ?: return
 
-            if (editMode.contains(player.uniqueId)) {
-                handleEdit(event, player, category)
-                return
-            }
-
-            if (pdc.has(NamespacedKey.minecraft("panel"))) {
-                return
-            }
-
             if (pdc.has(NamespacedKey.minecraft("page_back"))) {
                 val currentPage = InventoryManager.getCurrentItemIdPage(player)
                 if (currentPage > 0) {
@@ -96,6 +86,10 @@ class InventoryClickHandler {
             if (pdc.has(NamespacedKey.minecraft("page_next"))) {
                 val currentPage = InventoryManager.getCurrentItemIdPage(player)
                 InventoryManager.openItemIdInventory(player, category, currentPage + 1)
+                return
+            }
+
+            if (pdc.has(NamespacedKey.minecraft("panel"))) {
                 return
             }
 
@@ -114,6 +108,11 @@ class InventoryClickHandler {
                     editMode.add(player.uniqueId)
                 }
                 player.playSound(player, Sound.BLOCK_NOTE_BLOCK_PLING, 0.25f, 1f)
+                return
+            }
+
+            if (editMode.contains(player.uniqueId)) {
+                handleEdit(event, player, category)
                 return
             }
 
@@ -177,8 +176,7 @@ class InventoryClickHandler {
         }
 
         private fun handleEdit(event: InventoryClickEvent, player: Player, category: String) {
-            val clickedSlot = event.rawSlot
-            if (clickedSlot < 0 || clickedSlot >= 54) return
+            val clickedSlot = event.rawSlot + InventoryManager.getCurrentItemIdPage(player) * 45
 
             val clickedItem = event.currentItem
             val cursor = event.cursor
@@ -194,22 +192,19 @@ class InventoryClickHandler {
                     return
                 }
 
-                if (pdc.has(NamespacedKey.minecraft("edit_mode"))) {
-                    player.sendMessage(Component.text("§c編集モードを無効にしました"))
-                    editMode.remove(player.uniqueId)
-                    player.playSound(player, Sound.BLOCK_NOTE_BLOCK_PLING, 0.25f, 0.5f)
-                    return
-                }
+                if (!clickedItem.persistentDataContainer.has(NamespacedKey.minecraft("mmid"))) return
 
                 if (cursor.type.isAir) {
                     oldSlotCache[player.uniqueId] = clickedSlot
-                    event.setCursor(clickedItem)
+                    event.setCursor(clickedItem.clone())
+                    ItemBoxListener.setCursor(player, clickedItem.clone())
 
                     clickedItem.type = Material.BARRIER
                     event.currentItem = clickedItem
                     player.playSound(player, Sound.BLOCK_NOTE_BLOCK_PLING, 0.25f, 1f)
 
                 } else {
+                    if (!cursor.persistentDataContainer.has(NamespacedKey.minecraft("mmid"))) return
                     if (!oldSlotCache.contains(player.uniqueId)) return
                     val o = oldSlotCache[player.uniqueId] ?: return
 
@@ -223,9 +218,14 @@ class InventoryClickHandler {
                         clickedSlot
                     ) {
                         event.currentItem = cursor
-                        event.inventory.setItem(o, clickedItem)
                         event.setCursor(null)
                         player.playSound(player, Sound.BLOCK_NOTE_BLOCK_PLING, 0.25f, 2f)
+
+                        val rangeMin = InventoryManager.getCurrentItemIdPage(player) * 45
+                        val rangeMax = rangeMin + 45
+                        if (o in rangeMin..<rangeMax) {
+                            event.inventory.setItem(o % 45, clickedItem)
+                        }
                     }
                 }
             }

@@ -8,6 +8,7 @@ import org.bukkit.Sound
 import org.bukkit.entity.Item
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
+import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
 import org.bukkit.event.entity.EntityPickupItemEvent
 import org.bukkit.event.entity.PlayerDeathEvent
@@ -23,8 +24,14 @@ internal class ItemBoxListener : Listener {
 
     companion object {
         val willDelete = mutableSetOf<UUID>()
+        val willRemove = mutableSetOf<UUID>()
         val syncSlot = mutableListOf<Pair<UUID, Int>>()
         val ctContainer = mutableSetOf<UUID>()
+        val cursorCache = mutableMapOf<UUID, ItemStack>()
+
+        fun setCursor(player: Player, item: ItemStack) {
+            cursorCache[player.uniqueId] = item
+        }
     }
 
     @EventHandler
@@ -62,9 +69,10 @@ internal class ItemBoxListener : Listener {
         }, 10)
     }
 
-    @EventHandler
+    @EventHandler(ignoreCancelled = true)
     fun onClick(e: InventoryClickEvent) {
-        if (e.currentItem?.itemMeta?.persistentDataContainer?.has(NamespacedKey.minecraft("no_drop")) == true) {
+        val item = e.currentItem
+        if (item?.itemMeta?.persistentDataContainer?.has(NamespacedKey.minecraft("no_drop")) == true) {
             e.isCancelled = true
             return
         }
@@ -93,8 +101,15 @@ internal class ItemBoxListener : Listener {
 
         if (player.gameMode == GameMode.CREATIVE || player.gameMode == GameMode.SPECTATOR) return
 
-        val item = e.item.itemStack.clone()
-        if (item.itemMeta?.persistentDataContainer?.has(NamespacedKey.minecraft("no_drop")) == true) {
+        val item = e.item.itemStack
+        if (item.itemMeta.persistentDataContainer.has(NamespacedKey.minecraft("no_drop"))) {
+            return
+        }
+
+        if (item.itemMeta.persistentDataContainer.has(NamespacedKey.minecraft("mmid"))) {
+            e.isCancelled = true
+            e.item.itemStack.amount = 0
+            e.item.remove()
             return
         }
 
@@ -184,8 +199,14 @@ internal class ItemBoxListener : Listener {
 
         e.isCancelled = true
 
-        val item = e.itemDrop.itemStack.clone()
+        val item = e.itemDrop.itemStack
         if (item.itemMeta?.persistentDataContainer?.has(NamespacedKey.minecraft("no_drop")) == true) {
+            return
+        }
+
+        if (item.itemMeta.persistentDataContainer.has(NamespacedKey.minecraft("mmid"))) {
+            e.itemDrop.itemStack.amount = 0
+            e.itemDrop.remove()
             return
         }
         val entity = e.itemDrop.copy() as Item
@@ -267,17 +288,15 @@ internal class ItemBoxListener : Listener {
     }
 
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.LOWEST)
     fun onInventoryClose(e: InventoryCloseEvent) {
         val player = e.player as Player
-
-        //Editモードで選択中にInvを閉じると取り出せる問題の修正
-        if (InventoryClickHandler.isEditMode(player.uniqueId)) {
-            e.view.setCursor(null)
-        }
         
         // 詳細アイテム層の場合、インベントリの変更をデータベースに保存
         if (e.inventory.holder is DetailItemHolder) {
+
+            cursorCache.remove(player.uniqueId)
+
             val category = InventoryManager.getCurrentCategory(player)
             val mmid = InventoryManager.getCurrentMmid(player)
             
@@ -304,26 +323,53 @@ internal class ItemBoxListener : Listener {
                     }
                 }
             }
+        } else if (e.inventory.holder is ItemIdHolder) {
+
+            if (InventoryClickHandler.isEditMode(player.uniqueId)) {
+                willRemove.add(player.uniqueId)
+
+                e.view.setCursor(null)
+
+                PersonalStorage.runSyncDelay(runnable = {
+                    if (willRemove.contains(player.uniqueId)) {
+                        willRemove.remove(player.uniqueId)
+                        cursorCache.remove(player.uniqueId)
+                        InventoryClickHandler.removeEditMode(player.uniqueId)
+                        player.sendMessage(Component.text("§c編集モードを無効にしました"))
+                    }
+                }, 20)
+            }
+        } else {
+            cursorCache.remove(player.uniqueId)
         }
     }
 
     @EventHandler
     fun onInventoryOpen(e: InventoryOpenEvent) {
         val holder = e.inventory.holder
-        if (holder is DetailItemHolder ||
-            holder is ItemIdHolder ||
-            holder is MainCategoryHolder) {
-
-            willDelete.remove(e.player.uniqueId)
-        }
+        val player = e.player as Player
 
         if (!(holder is MainCategoryHolder ||
-            holder is ItemIdHolder ||
-            holder is DetailItemHolder
-        )) {
-            InventoryManager.clearPlayerData(e.player as Player)
-            willDelete.remove(e.player.uniqueId)
+                    holder is ItemIdHolder ||
+                    holder is DetailItemHolder
+                    )) {
+            InventoryManager.clearPlayerData(player)
         }
+
+        if (holder is ItemIdHolder) {
+            willRemove.remove(player.uniqueId)
+
+            //1tick遅延を入れないと透明アイテム化し、バグる
+           PersonalStorage.runSyncDelay(runnable = {
+               if (cursorCache.contains(player.uniqueId)) {
+                   player.openInventory.setCursor(cursorCache[player.uniqueId])
+                   player.updateInventory()
+                   cursorCache.remove(player.uniqueId)
+               }
+           }, 1)
+        }
+
+        willDelete.remove(player.uniqueId)
     }
 
     @EventHandler
