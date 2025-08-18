@@ -35,6 +35,14 @@ internal class ItemBoxListener : Listener {
     }
 
     @EventHandler
+    fun onSwap(e:PlayerSwapHandItemsEvent) {
+        val item = e.mainHandItem
+        if (item.itemMeta?.persistentDataContainer?.has(NamespacedKey.minecraft("no_drop")) == true) {
+            e.isCancelled = true
+        }
+    }
+
+    @EventHandler
     fun onJoin(e: PlayerJoinEvent) {
         val player = e.player
         player.inventory.setItem(8, getBoxItemStack())
@@ -63,9 +71,13 @@ internal class ItemBoxListener : Listener {
             e.playSound(e, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 2f)
         }, 5)
         PersonalStorage.runSyncDelay(runnable = {
-            e.closeInventory()
-            e.playSound(e, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 0.5f)
-            InventoryManager.openMainCategoryInventory(e)
+            if (e.inventory.heldItemSlot == 8) {
+                e.closeInventory()
+                e.playSound(e, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 0.5f)
+                InventoryManager.openMainCategoryInventory(e)
+            } else {
+                e.playSound(e, Sound.BLOCK_NOTE_BLOCK_PLING, 1f, 0.5f)
+            }
         }, 10)
     }
 

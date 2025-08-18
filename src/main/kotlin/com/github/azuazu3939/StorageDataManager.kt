@@ -11,7 +11,7 @@ class StorageDataManager {
     companion object {
         
         fun saveItem(player: Player, category: String, mmid: String, fSlot: Int, sSlot: Int, item: ItemStack?, callback: (() -> Unit)? = null) {
-            if (item != null && item.itemMeta.persistentDataContainer.has(NamespacedKey.minecraft("mmid"))) {
+            if (item != null && item.hasItemMeta() && item.itemMeta.persistentDataContainer.has(NamespacedKey.minecraft("mmid"))) {
                 item.amount = 0
             }
             PersonalStorage.runAsync(runnable = {
